@@ -98,15 +98,36 @@ agentName: Agent Name
 
 ## Deployment
 
-```bash
-# Using Docker
-docker-compose up -d
+### Using GitHub Container Registry (recommended for VPS)
 
-# Environment variables
-SHARED_TOKEN=your-secure-token
-PORT=3000
-SESSION_TIMEOUT_MS=3600000
+```bash
+# Pull the latest image
+docker pull ghcr.io/antonstjernquist/merge/relay-server:latest
+
+# Run with environment variables
+docker run -d \
+  --name merge-relay \
+  -p 3000:3000 \
+  -e SHARED_TOKEN=your-secure-token \
+  -e SESSION_TIMEOUT_MS=3600000 \
+  --restart unless-stopped \
+  ghcr.io/antonstjernquist/merge/relay-server:latest
 ```
+
+### Using Docker Compose (local development)
+
+```bash
+docker-compose up -d
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SHARED_TOKEN` | `dev-token` | Authentication token for agents |
+| `PORT` | `3000` | Server port |
+| `HOST` | `0.0.0.0` | Server host |
+| `SESSION_TIMEOUT_MS` | `3600000` | Session timeout (1 hour) |
 
 ## API Endpoints
 
