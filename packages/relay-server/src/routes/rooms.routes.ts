@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { CreateRoomRequest, JoinRoomRequest, JoinRoomWithTokenResponse, GetRoomAgentsResponse } from '@merge/shared-types';
 import { roomService } from '../services/room.service.js';
 import { agentService } from '../services/agent.service.js';
+import { config } from '../config.js';
 
 const router: Router = Router();
 
@@ -81,7 +82,7 @@ router.post('/:roomId/join', (req: Request, res: Response) => {
     // Use client-provided agent ID if available
     const result = agentService.connect(
       body.name,
-      '',
+      config.sharedToken,
       body.role || 'worker',
       body.skills || [],
       room.id,
