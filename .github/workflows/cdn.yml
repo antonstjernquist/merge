@@ -31,4 +31,5 @@ jobs:
           wrangler r2 object put kresis/merge/install.sh \
             --file scripts/install.sh \
             --content-type "text/x-shellscript" \
+            --jurisdiction eu \
             --remote
