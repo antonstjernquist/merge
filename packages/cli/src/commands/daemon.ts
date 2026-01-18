@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { WebSocketClient } from '../lib/websocket.js';
 import { loadConfig, isConnected } from '../lib/config.js';
+import { acceptTask } from '../lib/client.js';
 import type {
   WSMessage,
   RoomTaskPayload,
@@ -126,6 +127,15 @@ class AgentDaemon {
   private async executeTask(task: Task, _roomId: string): Promise<void> {
     console.log(`\nExecuting task: "${task.title}"`);
     console.log(`Description: ${task.description}`);
+
+    // Accept the task first via HTTP API
+    try {
+      await acceptTask(task.id);
+      console.log('Task accepted');
+    } catch (err) {
+      console.error(`Failed to accept task: ${err instanceof Error ? err.message : err}`);
+      return;
+    }
 
     if (!this.claudeCode) {
       // No Claude Code SDK - just log and send a placeholder result
