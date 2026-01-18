@@ -1,5 +1,5 @@
 #!/bin/bash
-# Merge CLI Installation Script
+# Agent-Merge CLI Installation Script
 # Usage: curl -fsSL https://cdn.kresis.ai/merge/install.sh | bash
 
 set -e
@@ -7,8 +7,9 @@ set -e
 REPO="antonstjernquist/merge"
 INSTALL_DIR="${HOME}/.merge"
 BIN_DIR="${HOME}/.local/bin"
+CLI_NAME="agent-merge"
 
-echo "Installing Merge CLI..."
+echo "Installing Agent-Merge CLI..."
 
 # Check for required tools
 command -v git >/dev/null 2>&1 || { echo "Error: git is required"; exit 1; }
@@ -38,23 +39,49 @@ echo "Building..."
 pnpm build --silent
 
 # Create wrapper script
-cat > "${BIN_DIR}/merge" << 'WRAPPER'
+cat > "${BIN_DIR}/${CLI_NAME}" << 'WRAPPER'
 #!/bin/bash
-node "${HOME}/.merge/src/packages/cli/bin/merge.js" "$@"
+node "${HOME}/.merge/src/packages/cli/bin/agent-merge.js" "$@"
 WRAPPER
-chmod +x "${BIN_DIR}/merge"
+chmod +x "${BIN_DIR}/${CLI_NAME}"
+
+# Detect shell and profile file
+detect_shell_profile() {
+    if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "$(which zsh)" ] || [ -f "${HOME}/.zshrc" ]; then
+        echo "${HOME}/.zshrc"
+    elif [ -n "$BASH_VERSION" ] || [ "$SHELL" = "$(which bash)" ]; then
+        if [ -f "${HOME}/.bash_profile" ]; then
+            echo "${HOME}/.bash_profile"
+        else
+            echo "${HOME}/.bashrc"
+        fi
+    else
+        echo "${HOME}/.profile"
+    fi
+}
 
 # Add to PATH if needed
+PATH_EXPORT="export PATH=\"\${HOME}/.local/bin:\${PATH}\""
+
 if [[ ":$PATH:" != *":${BIN_DIR}:"* ]]; then
-    echo ""
-    echo "Add this to your shell profile (~/.bashrc or ~/.zshrc):"
-    echo "  export PATH=\"\${HOME}/.local/bin:\${PATH}\""
-    echo ""
+    PROFILE_FILE=$(detect_shell_profile)
+
+    # Check if already in profile
+    if ! grep -q ".local/bin" "${PROFILE_FILE}" 2>/dev/null; then
+        echo "" >> "${PROFILE_FILE}"
+        echo "# Added by agent-merge installer" >> "${PROFILE_FILE}"
+        echo "${PATH_EXPORT}" >> "${PROFILE_FILE}"
+        echo "Added PATH to ${PROFILE_FILE}"
+        echo ""
+        echo "Run this to use immediately: source ${PROFILE_FILE}"
+    fi
 fi
 
-echo "Merge CLI installed successfully!"
+echo ""
+echo "Agent-Merge CLI installed successfully!"
 echo ""
 echo "Quick start:"
-echo "  merge connect --token YOUR_TOKEN --name \"Agent Name\" --server https://merge.kresis.ai"
-echo "  merge status"
-echo "  merge poll"
+echo "  ${CLI_NAME} connect --token YOUR_TOKEN --name \"Agent Name\" --server https://merge.kresis.ai"
+echo "  ${CLI_NAME} status"
+echo "  ${CLI_NAME} poll"
+echo ""

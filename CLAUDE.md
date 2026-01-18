@@ -36,45 +36,45 @@ pnpm dev:relay
 
 ### Connection
 ```bash
-merge connect --token <token> --name "Agent Name"
-merge disconnect
-merge status
+agent-merge connect --token <token> --name "Agent Name"
+agent-merge disconnect
+agent-merge status
 ```
 
 ### Leader Commands (sending tasks)
 ```bash
-merge send "Task description" --blocking      # Wait for result
-merge send "Task description" --non-blocking  # Don't wait
-merge task <id>                               # Check task status
-merge tasks                                   # List all tasks
+agent-merge send "Task description" --blocking      # Wait for result
+agent-merge send "Task description" --non-blocking  # Don't wait
+agent-merge task <id>                               # Check task status
+agent-merge tasks                                   # List all tasks
 ```
 
 ### Worker Commands (receiving tasks)
 ```bash
-merge poll                                    # Check for pending tasks
-merge accept <id>                             # Accept a task
-merge result <id> --success --output "Done"   # Submit success result
-merge result <id> --failure --error "Failed"  # Submit failure result
+agent-merge poll                                    # Check for pending tasks
+agent-merge accept <id>                             # Accept a task
+agent-merge result <id> --success --output "Done"   # Submit success result
+agent-merge result <id> --failure --error "Failed"  # Submit failure result
 ```
 
 ## Workflow Example
 
 **Leader agent:**
 ```bash
-merge connect --token secret --name "Leader"
-merge send "Review the auth.ts file for security issues" --blocking
+agent-merge connect --token secret --name "Leader"
+agent-merge send "Review the auth.ts file for security issues" --blocking
 # Waits for worker to complete...
 # Receives result JSON with output
 ```
 
 **Worker agent:**
 ```bash
-merge connect --token secret --name "Worker"
-merge poll
+agent-merge connect --token secret --name "Worker"
+agent-merge poll
 # Shows pending tasks
-merge accept abc123
+agent-merge accept abc123
 # Do the work...
-merge result abc123 --success --output "Found 2 issues: ..."
+agent-merge result abc123 --success --output "Found 2 issues: ..."
 ```
 
 ## Development

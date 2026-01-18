@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "merge": "./bin/merge.js"
+    "agent-merge": "./bin/agent-merge.js"
   },
   "main": "./dist/index.js",
   "scripts": {
