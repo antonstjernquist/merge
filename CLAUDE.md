@@ -6,6 +6,14 @@ Merge enables two Claude Code agents to collaborate via task delegation through 
 
 ## Quick Start
 
+### Install CLI
+
+```bash
+curl -fsSL https://cdn.kresis.ai/merge/install.sh | bash
+```
+
+### Development Setup
+
 ```bash
 # Install dependencies
 pnpm install
@@ -15,9 +23,6 @@ pnpm build
 
 # Start relay server (development)
 pnpm dev:relay
-
-# Link CLI globally (in packages/cli directory)
-cd packages/cli && pnpm link --global
 ```
 
 ## Architecture
