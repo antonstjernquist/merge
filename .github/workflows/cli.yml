@@ -6,6 +6,7 @@ on:
     paths:
       - 'packages/cli/**'
       - 'packages/shared-types/**'
+      - 'scripts/**'
       - '.github/workflows/cli.yml'
   workflow_dispatch:
 
