@@ -13,8 +13,24 @@ echo "Installing Agent-Merge CLI..."
 
 # Check for required tools
 command -v git >/dev/null 2>&1 || { echo "Error: git is required"; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "Error: node is required"; exit 1; }
-command -v pnpm >/dev/null 2>&1 || { echo "Error: pnpm is required. Install with: npm install -g pnpm"; exit 1; }
+
+# Detect package manager and runtime (prefer bun)
+if command -v bun >/dev/null 2>&1; then
+    PKG_MANAGER="bun"
+    RUNTIME="bun"
+    echo "Using bun..."
+elif command -v pnpm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    PKG_MANAGER="pnpm"
+    RUNTIME="node"
+    echo "Using pnpm + node..."
+elif command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    PKG_MANAGER="npm"
+    RUNTIME="node"
+    echo "Using npm + node..."
+else
+    echo "Error: bun, or node with pnpm/npm is required"
+    exit 1
+fi
 
 # Create directories
 mkdir -p "${INSTALL_DIR}"
@@ -33,15 +49,20 @@ fi
 
 # Install dependencies and build
 echo "Installing dependencies..."
-pnpm install --silent
+if [ "$PKG_MANAGER" = "bun" ]; then
+    bun install
+else
+    $PKG_MANAGER install --silent 2>/dev/null || $PKG_MANAGER install
+fi
 
 echo "Building..."
-pnpm build --silent
+# Note: Don't use --silent with nx as it passes through to tsc which doesn't support it
+$PKG_MANAGER run build
 
-# Create wrapper script
-cat > "${BIN_DIR}/${CLI_NAME}" << 'WRAPPER'
+# Create wrapper script with detected runtime
+cat > "${BIN_DIR}/${CLI_NAME}" << WRAPPER
 #!/bin/bash
-node "${HOME}/.merge/src/packages/cli/bin/agent-merge.js" "$@"
+${RUNTIME} "\${HOME}/.merge/src/packages/cli/bin/agent-merge.js" "\$@"
 WRAPPER
 chmod +x "${BIN_DIR}/${CLI_NAME}"
 
