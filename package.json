@@ -1,0 +1,22 @@
+{
+  "name": "merge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code Agent Collaboration System",
+  "scripts": {
+    "build": "nx run-many --target=build --all",
+    "dev:relay": "pnpm --filter @merge/relay-server dev",
+    "dev:cli": "pnpm --filter @merge/cli dev",
+    "lint": "nx run-many --target=lint --all",
+    "test": "nx run-many --target=test --all"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "nx": "19.8.4",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
