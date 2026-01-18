@@ -21,7 +21,7 @@ async function hasClaudeCLI(): Promise<boolean> {
 // Run claude CLI with a prompt
 function runClaude(prompt: string, cwd: string): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
-    const proc = spawn('claude', ['-p', prompt, '--no-input'], {
+    const proc = spawn('claude', ['-p', prompt], {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
