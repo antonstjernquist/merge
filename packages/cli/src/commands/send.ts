@@ -8,7 +8,7 @@ export const sendCommand = new Command('send')
   .option('--description <desc>', 'Detailed task description')
   .option('--blocking', 'Wait for task completion (default)')
   .option('--non-blocking', 'Do not wait for task completion')
-  .option('--timeout <ms>', 'Timeout for blocking tasks in milliseconds', '300000')
+  .option('--timeout <seconds>', 'Timeout for blocking tasks in seconds', '300')
   .action(async (title, options) => {
     try {
       if (!isConnected()) {
@@ -48,7 +48,7 @@ export const sendCommand = new Command('send')
       const completedTask = await waitForTaskCompletion(
         task.id,
         2000,
-        parseInt(options.timeout, 10)
+        parseInt(options.timeout, 10) * 1000 // Convert seconds to ms
       );
 
       console.log(JSON.stringify({
