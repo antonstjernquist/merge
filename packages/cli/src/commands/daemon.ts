@@ -85,9 +85,12 @@ class AgentDaemon {
       case 'room_task':
         this.handleNewTask(message.payload as RoomTaskPayload);
         break;
-      case 'task_created':
-        // Could also handle task_created if needed
+      case 'task_created': {
+        // Handle tasks created via HTTP API
+        const payload = message.payload as { task: Task };
+        this.handleNewTask({ task: payload.task, roomId: 'default' });
         break;
+      }
     }
   }
 
