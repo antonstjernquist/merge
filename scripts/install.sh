@@ -14,21 +14,23 @@ echo "Installing Agent-Merge CLI..."
 # Check for required tools
 command -v git >/dev/null 2>&1 || { echo "Error: git is required"; exit 1; }
 
-# Detect package manager and runtime (prefer bun)
+# Detect package manager and runtime
+# Note: This project uses nx which has compatibility issues with bun
+# So we use pnpm/npm for install+build, but can use bun for runtime
 if command -v bun >/dev/null 2>&1; then
-    PKG_MANAGER="bun"
     RUNTIME="bun"
-    echo "Using bun..."
-elif command -v pnpm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
-    PKG_MANAGER="pnpm"
+else
     RUNTIME="node"
-    echo "Using pnpm + node..."
+fi
+
+if command -v pnpm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    PKG_MANAGER="pnpm"
+    echo "Using pnpm (runtime: ${RUNTIME})..."
 elif command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
     PKG_MANAGER="npm"
-    RUNTIME="node"
-    echo "Using npm + node..."
+    echo "Using npm (runtime: ${RUNTIME})..."
 else
-    echo "Error: bun, or node with pnpm/npm is required"
+    echo "Error: node with pnpm or npm is required"
     exit 1
 fi
 
@@ -49,11 +51,7 @@ fi
 
 # Install dependencies and build
 echo "Installing dependencies..."
-if [ "$PKG_MANAGER" = "bun" ]; then
-    bun install
-else
-    $PKG_MANAGER install --silent 2>/dev/null || $PKG_MANAGER install
-fi
+$PKG_MANAGER install --silent 2>/dev/null || $PKG_MANAGER install
 
 echo "Building..."
 # Note: Don't use --silent with nx as it passes through to tsc which doesn't support it
