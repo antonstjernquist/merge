@@ -2,29 +2,37 @@
 
 **Claude Code Agent Collaboration System**
 
-Merge enables two Claude Code agents to collaborate via task delegation through a relay server. One agent (leader) sends tasks, the other (worker) executes and returns results.
+Merge enables multiple Claude Code agents to collaborate via task delegation through a relay server. Agents join rooms with API key protection, declare their roles and skills, and tasks are routed to the right agent.
 
 ## Architecture
 
 ```
-┌─────────────────┐              ┌─────────────────┐
-│  Agent A        │              │  Agent B        │
-│  (Leader)       │              │  (Worker)       │
-│  ┌───────────┐  │              │  ┌───────────┐  │
-│  │ Claude    │  │              │  │ Claude    │  │
-│  │ Code      │  │              │  │ Code      │  │
-│  └─────┬─────┘  │              │  └─────┬─────┘  │
-│        │        │              │        │        │
-│  ┌─────▼─────┐  │              │  ┌─────▼─────┐  │
-│  │ merge CLI │  │              │  │ merge CLI │  │
-│  └───────────┘  │              │  └───────────┘  │
-└────────┬────────┘              └────────┬────────┘
-         │                                │
-         │    ┌──────────────────────┐    │
-         └───►│  Relay Server (VPS)  │◄───┘
-              │  WebSocket + HTTP    │
-              └──────────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Agent A        │    │  Agent B        │    │  Agent C        │
+│  (Leader)       │    │  (Worker)       │    │  (Worker)       │
+│  skills: []     │    │  skills:        │    │  skills:        │
+│                 │    │   - testing     │    │   - review      │
+│  ┌───────────┐  │    │  ┌───────────┐  │    │  ┌───────────┐  │
+│  │ Claude    │  │    │  │ Claude    │  │    │  │ Claude    │  │
+│  │ Code      │  │    │  │ Code      │  │    │  │ Code      │  │
+│  └─────┬─────┘  │    │  └─────┬─────┘  │    │  └─────┬─────┘  │
+│  ┌─────▼─────┐  │    │  ┌─────▼─────┐  │    │  ┌─────▼─────┐  │
+│  │ merge CLI │  │    │  │ merge CLI │  │    │  │ merge CLI │  │
+│  └───────────┘  │    │  └───────────┘  │    │  └───────────┘  │
+└────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+         │                      │                      │
+         │    ┌─────────────────┴──────────────────┐   │
+         └───►│        Relay Server (VPS)          │◄──┘
+              │   Rooms · Routing · WebSocket      │
+              └────────────────────────────────────┘
 ```
+
+## Features
+
+- **Room-based isolation** - Agents join rooms protected by API keys
+- **Agent roles** - Leader, worker, or both
+- **Skills** - Agents declare capabilities for targeted routing
+- **Targeted tasks** - Route to specific agent, by skill, or broadcast to all
 
 ## Packages
 
@@ -72,30 +80,74 @@ pnpm link --global
 
 </details>
 
-### 3. Connect Agents
+### 3. Join a Room
 
-**Terminal 1 (Leader):**
+**Terminal 1 (Leader) - Creates and locks the room:**
 ```bash
-merge connect --token your-secure-token --name "Leader" --server http://your-vps:3000
-merge send "Review the auth module for security issues" --blocking
+merge join my-project \
+  --key secret-room-key \
+  --name "Leader" \
+  --role leader \
+  --server http://your-vps:3000
 ```
 
-**Terminal 2 (Worker):**
+**Terminal 2 (Worker with testing skills):**
 ```bash
-merge connect --token your-secure-token --name "Worker" --server http://your-vps:3000
-merge poll
-merge accept <task-id>
-# ... do the work ...
-merge result <task-id> --success --output "Found 2 issues: SQL injection in login(), missing rate limiting"
+merge join my-project \
+  --key secret-room-key \
+  --name "Tester" \
+  --role worker \
+  --skills testing,qa \
+  --server http://your-vps:3000
+```
+
+**Terminal 3 (Worker with review skills):**
+```bash
+merge join my-project \
+  --key secret-room-key \
+  --name "Reviewer" \
+  --role worker \
+  --skills review,security \
+  --server http://your-vps:3000
+```
+
+### 4. Send Tasks
+
+```bash
+# Route to agent with specific skill
+merge send "Run the test suite" --to-skill testing --blocking
+
+# Route to specific agent by name
+merge send "Check the auth module" --to Reviewer --blocking
+
+# Broadcast to all workers
+merge send "Update your dependencies" --broadcast
+
+# List agents in the room
+merge agents
 ```
 
 ## How It Works
 
-1. **Leader** creates a task via `merge send`
-2. **Relay server** stores the task and notifies connected agents via WebSocket
-3. **Worker** polls for tasks via `merge poll`, accepts one via `merge accept`
-4. **Worker** completes the work and submits result via `merge result`
-5. **Leader** receives the result (if `--blocking` was used, it waits automatically)
+1. **Agents join a room** with `merge join`, providing a room key (first agent locks the room)
+2. **Leader** creates a task via `merge send` with optional targeting
+3. **Relay server** routes the task based on target (skill, agent name, or broadcast)
+4. **Worker** polls for tasks via `merge poll`, accepts one via `merge accept`
+5. **Worker** completes the work and submits result via `merge result`
+6. **Leader** receives the result (if `--blocking` was used, it waits automatically)
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `merge join <room>` | Join a room with role, skills, and optional API key |
+| `merge agents` | List agents in the current room |
+| `merge send <title>` | Send a task with optional targeting |
+| `merge poll` | Poll for pending tasks |
+| `merge accept <id>` | Accept a task |
+| `merge result <id>` | Submit task result |
+| `merge status` | Show connection status |
+| `merge connect` | Legacy: Connect without room features |
 
 ## Development
 
@@ -134,13 +186,20 @@ wsUrl: ws://localhost:3000
 token: your-token
 agentId: <auto-generated>
 agentName: Agent Name
+defaultRoom: my-project
+roomKey: secret-room-key
+role: worker
+skills:
+  - testing
+  - review
 ```
 
 ## Security Considerations
 
-- Use a strong, unique `SHARED_TOKEN` in production
+- **Room API keys** - Each room can be locked with an API key; only agents with the correct key can join
+- **SHARED_TOKEN** - Optional admin token for legacy connect flow
 - Deploy the relay server behind HTTPS (use a reverse proxy like nginx/caddy)
-- The relay server is designed for a single pair of trusted agents
+- Room keys are stored as SHA-256 hashes on the server
 - Task content is not encrypted in transit beyond TLS
 
 ## License
