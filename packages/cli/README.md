@@ -13,169 +13,170 @@ curl -fsSL https://cdn.kresis.ai/merge/install.sh | bash
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/antonstjernquist/merge.git
 cd merge
-
-# Install dependencies and build
 pnpm install
 pnpm build
-
-# Link globally
 cd packages/cli
 pnpm link --global
-
-# Now you can use 'merge' from anywhere
-merge --help
 ```
 
-### Verify Installation
+## Quick Start
 
 ```bash
-merge --version
-merge status
+# Join a room as a worker
+merge join my-project \
+  --name "Worker" \
+  --role worker \
+  --skills coding,testing \
+  --server http://your-vps:3000 \
+  --token your-token
+
+# Or run as auto-executing daemon
+merge daemon \
+  --name "Worker" \
+  --server http://your-vps:3000 \
+  --token your-token \
+  --auto-accept
 ```
 
 ## Commands
 
-### Connection Management
+### Room Management
 
-#### `merge connect`
+#### `merge join <room>`
 
-Connect to a relay server.
+Join a room with role and skills.
 
 ```bash
-merge connect --token <token> --name "Agent Name" [--server <url>]
+merge join <room> --name <name> [options]
 ```
 
 **Options:**
-- `--token <token>` (required) - Authentication token
-- `--name <name>` (required) - Display name for this agent
-- `--server <url>` - Server URL (default: http://localhost:3000)
+- `--name <name>` (required) - Agent display name
+- `--role <role>` - `leader`, `worker`, or `both` (default: worker)
+- `--skills <skills>` - Comma-separated skills
+- `--server <url>` - Server URL
+- `--token <token>` - Authentication token
+- `--key <key>` - Room API key (locks room on first join)
 
 **Example:**
 ```bash
-merge connect --token secret123 --name "Leader" --server https://merge.example.com
+merge join my-project \
+  --name "Tester" \
+  --role worker \
+  --skills testing,qa \
+  --server https://merge.example.com \
+  --token secret123
 ```
 
-#### `merge disconnect`
+#### `merge agents`
 
-Disconnect from the relay server.
-
-```bash
-merge disconnect
-```
-
-#### `merge status`
-
-Show current connection status.
+List agents in the current room.
 
 ```bash
-merge status
+merge agents
 ```
 
 **Output:**
 ```json
 {
-  "connected": true,
-  "agent": { "id": "uuid", "name": "Leader" },
-  "serverUrl": "http://localhost:3000",
-  "pendingTasks": 2,
-  "activeTasks": 1
+  "success": true,
+  "room": "my-project",
+  "agents": [
+    { "id": "uuid", "name": "Tester", "role": "worker", "skills": ["testing", "qa"], "isConnected": true }
+  ]
 }
 ```
 
-### Task Management (Leader)
+### Daemon Mode
 
-#### `merge send`
+#### `merge daemon`
 
-Send a task to another agent.
+Run as a daemon that auto-accepts and executes tasks via Claude Code CLI.
+
+```bash
+merge daemon [options]
+```
+
+**Options:**
+- `--name <name>` - Agent name (required on first run)
+- `--room <room>` - Room to join (default: "default")
+- `--role <role>` - Agent role (default: worker)
+- `--skills <skills>` - Comma-separated skills
+- `--server <url>` - Server URL
+- `--token <token>` - Authentication token
+- `--cwd <dir>` - Working directory for task execution
+- `--auto-accept` - Automatically accept and execute incoming tasks
+- `--verbose` - Enable verbose logging
+
+**Features:**
+- Self-registers on startup (no prior `join` needed)
+- Uses persistent client-controlled agent ID
+- Auto-reconnects on disconnect
+- Executes tasks via `claude` CLI if available
+
+**Example:**
+```bash
+# First run - provide all options
+merge daemon \
+  --name "Worker" \
+  --server http://your-vps:3000 \
+  --token your-token \
+  --room my-project \
+  --skills coding,testing \
+  --auto-accept \
+  --verbose
+
+# Subsequent runs - config is persisted
+merge daemon --auto-accept
+```
+
+### Task Sending (Leader)
+
+#### `merge send <title>`
+
+Send a task with optional targeting.
 
 ```bash
 merge send "<title>" [options]
 ```
 
-**Options:**
-- `--description <desc>` - Detailed task description (defaults to title)
-- `--blocking` - Wait for task completion (default)
-- `--non-blocking` - Return immediately after creating task
-- `--timeout <ms>` - Timeout for blocking tasks (default: 300000ms / 5 min)
+**Targeting Options:**
+- `--to <agent>` - Route to specific agent by name
+- `--to-skill <skill>` - Route to agent with specific skill
+- `--broadcast` - Send to all workers in the room
+- `--room <room>` - Target room (defaults to current)
+
+**Other Options:**
+- `--description <desc>` - Detailed description
+- `--blocking` - Wait for completion (default)
+- `--non-blocking` - Return immediately
+- `--timeout <seconds>` - Timeout in seconds (default: 300)
 
 **Examples:**
 ```bash
-# Send a blocking task (waits for result)
-merge send "Review auth.ts for security issues" --blocking
+# Route to agent with specific skill
+merge send "Run the test suite" --to-skill testing --blocking
 
-# Send with detailed description
-merge send "Code Review" --description "Review the authentication module in src/auth.ts. Check for SQL injection, XSS, and rate limiting issues."
+# Route to specific agent by name
+merge send "Review auth module" --to Reviewer --blocking
 
-# Send non-blocking (returns immediately)
-merge send "Run test suite" --non-blocking
+# Broadcast to all workers
+merge send "Update dependencies" --broadcast
 ```
-
-**Blocking Output:**
-```json
-{
-  "success": true,
-  "task": {
-    "id": "task-uuid",
-    "title": "Review auth.ts for security issues",
-    "status": "completed",
-    "result": {
-      "success": true,
-      "output": "Found 2 issues: ..."
-    }
-  }
-}
-```
-
-#### `merge task`
-
-Get details of a specific task.
-
-```bash
-merge task <taskId>
-```
-
-#### `merge tasks`
-
-List all tasks related to this agent.
-
-```bash
-merge tasks [--status <status>]
-```
-
-**Options:**
-- `--status <status>` - Filter by status: `pending`, `assigned`, `in_progress`, `completed`, `failed`
 
 ### Task Execution (Worker)
 
 #### `merge poll`
 
-Check for pending tasks available to accept.
+Check for pending tasks.
 
 ```bash
 merge poll
 ```
 
-**Output:**
-```json
-{
-  "success": true,
-  "count": 1,
-  "tasks": [
-    {
-      "id": "task-uuid",
-      "title": "Review auth.ts for security issues",
-      "description": "...",
-      "blocking": true,
-      "createdAt": "2024-01-01T00:00:00.000Z"
-    }
-  ]
-}
-```
-
-#### `merge accept`
+#### `merge accept <taskId>`
 
 Accept a pending task.
 
@@ -183,42 +184,55 @@ Accept a pending task.
 merge accept <taskId>
 ```
 
-**Output:**
-```json
-{
-  "success": true,
-  "message": "Task accepted",
-  "task": {
-    "id": "task-uuid",
-    "title": "Review auth.ts for security issues",
-    "description": "...",
-    "status": "assigned"
-  }
-}
-```
+#### `merge result <taskId>`
 
-#### `merge result`
-
-Submit the result for an accepted task.
+Submit task result.
 
 ```bash
-merge result <taskId> --success --output "<output>"
-merge result <taskId> --failure --error "<error message>"
+merge result <taskId> --success --output "Done"
+merge result <taskId> --failure --error "Failed"
 ```
 
-**Options:**
-- `--success` - Mark task as successfully completed
-- `--failure` - Mark task as failed
-- `--output <output>` - Result output message
-- `--error <error>` - Error message (for failures)
+### Utility Commands
 
-**Examples:**
+#### `merge status`
+
+Show connection status.
+
 ```bash
-# Success
-merge result abc123 --success --output "Found 2 issues: SQL injection in login(), missing rate limiting on /api/auth"
+merge status
+```
 
-# Failure
-merge result abc123 --failure --error "Could not complete: file not found"
+#### `merge task <taskId>`
+
+Get task details.
+
+```bash
+merge task <taskId>
+```
+
+#### `merge tasks`
+
+List all tasks.
+
+```bash
+merge tasks [--status <status>]
+```
+
+#### `merge listen`
+
+Listen for real-time WebSocket events.
+
+```bash
+merge listen [--room <room>] [--json] [--types <types>]
+```
+
+#### `merge connect` (Legacy)
+
+Connect without room features.
+
+```bash
+merge connect --token <token> --name <name> [--server <url>]
 ```
 
 ## Configuration
@@ -229,97 +243,39 @@ Configuration is stored in `~/.merge/config.yaml`:
 serverUrl: http://localhost:3000
 wsUrl: ws://localhost:3000
 token: your-token
-agentId: auto-generated-uuid
+agentId: <persistent-uuid>  # Auto-generated, never changes
 agentName: Agent Name
+defaultRoom: my-project
+role: worker
+skills:
+  - coding
+  - testing
 ```
 
-### Configuration Location
+### Persistent Agent ID
 
-- Linux/macOS: `~/.merge/config.yaml`
-- Windows: `%USERPROFILE%\.merge\config.yaml`
+The CLI generates a unique agent ID on first run and persists it. This ID is client-controlled and survives:
+- CLI restarts
+- Server restarts
+- Reconnections
 
-## Workflow Example
-
-### Leader Agent
-
-```bash
-# 1. Connect to the relay server
-merge connect --token secret --name "Leader" --server https://merge.example.com
-
-# 2. Send a task and wait for result
-merge send "Review the authentication module for security vulnerabilities" --blocking
-
-# Output after worker completes:
-# {
-#   "success": true,
-#   "task": {
-#     "id": "abc123",
-#     "title": "Review the authentication module...",
-#     "status": "completed",
-#     "result": {
-#       "success": true,
-#       "output": "Found 2 issues: ..."
-#     }
-#   }
-# }
-
-# 3. Use the result to continue work
-# ...
-```
-
-### Worker Agent
-
-```bash
-# 1. Connect to the relay server
-merge connect --token secret --name "Worker" --server https://merge.example.com
-
-# 2. Poll for pending tasks
-merge poll
-
-# Output:
-# {
-#   "success": true,
-#   "count": 1,
-#   "tasks": [
-#     { "id": "abc123", "title": "Review the authentication module..." }
-#   ]
-# }
-
-# 3. Accept the task
-merge accept abc123
-
-# 4. Do the work...
-# (review the code, find issues, etc.)
-
-# 5. Submit the result
-merge result abc123 --success --output "Found 2 issues: SQL injection in login(), missing rate limiting"
-```
+This ensures seamless reconnection without server-side state management.
 
 ## Output Format
 
-All commands output JSON to stdout for easy parsing. Errors are output to stderr.
+All commands output JSON to stdout. Errors go to stderr.
 
-**Success:**
 ```json
 {
   "success": true,
-  "message": "...",
-  "...": "..."
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "error": "Error message"
+  "message": "..."
 }
 ```
 
 ## Exit Codes
 
 - `0` - Success
-- `1` - Error (authentication, network, validation, etc.)
+- `1` - Error
 
 ## License
 
