@@ -11,6 +11,8 @@ import { taskCommand } from './commands/task.js';
 import { tasksCommand } from './commands/tasks.js';
 import { listenCommand } from './commands/listen.js';
 import { daemonCommand } from './commands/daemon.js';
+import { joinCommand } from './commands/join.js';
+import { agentsCommand } from './commands/agents.js';
 
 const program = new Command();
 
@@ -22,6 +24,8 @@ program
 // Add all commands
 program.addCommand(connectCommand);
 program.addCommand(disconnectCommand);
+program.addCommand(joinCommand);
+program.addCommand(agentsCommand);
 program.addCommand(sendCommand);
 program.addCommand(pollCommand);
 program.addCommand(acceptCommand);

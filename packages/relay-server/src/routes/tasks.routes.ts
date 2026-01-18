@@ -2,6 +2,7 @@ import { Router, type IRouter } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { requireAgent } from '../middleware/auth.js';
 import { taskService } from '../services/task.service.js';
+import { agentService } from '../services/agent.service.js';
 import type {
   CreateTaskRequest,
   CreateTaskResponse,
@@ -16,7 +17,7 @@ const router: IRouter = Router();
 // POST /api/v1/tasks - Create a new task
 router.post('/', requireAgent, (req: AuthenticatedRequest, res) => {
   const agentId = req.agentId!;
-  const body = req.body as CreateTaskRequest;
+  const body = req.body as CreateTaskRequest & { roomId?: string };
 
   if (!body.title || typeof body.title !== 'string') {
     res.status(400).json({ error: 'Title is required' });
@@ -28,7 +29,10 @@ router.post('/', requireAgent, (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const task = taskService.createTask(agentId, body);
+  const agent = agentService.getAgent(agentId);
+  const roomId = body.roomId || agent?.currentRoomId || 'default';
+
+  const task = taskService.createTask(agentId, roomId, body);
 
   const response: CreateTaskResponse = { task };
   res.status(201).json(response);
@@ -46,7 +50,11 @@ router.get('/', requireAgent, (req: AuthenticatedRequest, res) => {
 // GET /api/v1/tasks/pending - Get pending tasks (for workers to poll)
 router.get('/pending', requireAgent, (req: AuthenticatedRequest, res) => {
   const agentId = req.agentId!;
-  const tasks = taskService.getPendingTasks(agentId);
+  const agent = agentService.getAgent(agentId);
+  const roomId = (req.query.roomId as string) || agent?.currentRoomId || 'default';
+  const agentSkills = agent?.skills || [];
+
+  const tasks = taskService.getPendingTasksForAgent(agentId, roomId, agentSkills);
 
   const response: GetTasksResponse = { tasks };
   res.json(response);

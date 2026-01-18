@@ -242,19 +242,13 @@ class WSService {
   private handleSendTask(client: WSClient, payload: SendTaskPayload): void {
     if (!client.agentId) return;
 
-    const task = taskService.createTask(client.agentId, {
+    const task = taskService.createTask(client.agentId, payload.roomId, {
       title: payload.title,
       description: payload.description,
       blocking: payload.blocking,
       toAgentId: payload.toAgentId,
+      target: payload.target,
     });
-
-    // Notify room members about new task
-    this.broadcastToRoom(payload.roomId, {
-      type: 'room_task',
-      payload: { task, roomId: payload.roomId },
-      timestamp: new Date().toISOString(),
-    }, client.agentId); // Exclude sender
   }
 
   private handleTaskProgress(client: WSClient, payload: TaskProgressPayload): void {
@@ -318,6 +312,32 @@ class WSService {
 
     this.clients.forEach((client) => {
       if (client.agentId && agentIds.includes(client.agentId)) {
+        if (excludeAgentId && client.agentId === excludeAgentId) {
+          return;
+        }
+        this.send(client.ws, message);
+      }
+    });
+  }
+
+  broadcastToAgentsWithSkill(roomId: string, skill: string, message: WSMessage, excludeAgentId?: string): void {
+    const agents = agentService.getAgentsBySkill(skill, roomId);
+
+    this.clients.forEach((client) => {
+      if (client.agentId && agents.some((a) => a.id === client.agentId)) {
+        if (excludeAgentId && client.agentId === excludeAgentId) {
+          return;
+        }
+        this.send(client.ws, message);
+      }
+    });
+  }
+
+  broadcastToRoomWorkers(roomId: string, message: WSMessage, excludeAgentId?: string): void {
+    const workers = agentService.getRoomWorkers(roomId);
+
+    this.clients.forEach((client) => {
+      if (client.agentId && workers.some((a) => a.id === client.agentId)) {
         if (excludeAgentId && client.agentId === excludeAgentId) {
           return;
         }

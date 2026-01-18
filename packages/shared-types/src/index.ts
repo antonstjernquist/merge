@@ -1,6 +1,17 @@
 // Task status enum
 export type TaskStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed';
 
+// Agent role type
+export type AgentRole = 'leader' | 'worker' | 'both';
+
+// Task routing target
+export interface TaskTarget {
+  agentId?: string;
+  agentName?: string;
+  skill?: string;
+  broadcast?: boolean;
+}
+
 // Task result interface
 export interface TaskResult {
   success: boolean;
@@ -11,12 +22,14 @@ export interface TaskResult {
 // Core Task interface
 export interface Task {
   id: string;
+  roomId: string;
   fromAgentId: string;
   toAgentId: string | null;
   title: string;
   description: string;
   blocking: boolean;
   status: TaskStatus;
+  target?: TaskTarget;
   result?: TaskResult;
   createdAt: string;
   updatedAt: string;
@@ -26,9 +39,21 @@ export interface Task {
 export interface Agent {
   id: string;
   name: string;
+  role: AgentRole;
+  skills: string[];
   token: string;
+  currentRoomId: string | null;
   connectedAt: string;
   lastSeenAt: string;
+  isConnected: boolean;
+}
+
+// Public agent info (safe to expose)
+export interface AgentInfo {
+  id: string;
+  name: string;
+  role: AgentRole;
+  skills: string[];
   isConnected: boolean;
 }
 
@@ -36,6 +61,9 @@ export interface Agent {
 export interface Room {
   id: string;
   name: string;
+  apiKeyHash: string | null;
+  isLocked: boolean;
+  createdBy: string | null;
   createdAt: string;
   agentIds: string[];
 }
@@ -133,6 +161,7 @@ export interface SendTaskPayload {
   description: string;
   blocking?: boolean;
   toAgentId?: string;
+  target?: TaskTarget;
 }
 
 // Task progress/result payloads
@@ -154,6 +183,7 @@ export interface CreateTaskRequest {
   description: string;
   blocking?: boolean;
   toAgentId?: string;
+  target?: TaskTarget;
 }
 
 export interface CreateTaskResponse {
@@ -180,10 +210,26 @@ export interface SubmitResultResponse {
 
 export interface ConnectRequest {
   name: string;
+  role?: AgentRole;
+  skills?: string[];
 }
 
 export interface ConnectResponse {
   agent: Agent;
+  token: string;
+}
+
+// Join room request/response
+export interface JoinRoomRequest {
+  name: string;
+  role: AgentRole;
+  skills: string[];
+  roomKey?: string;
+}
+
+export interface JoinRoomWithTokenResponse {
+  agent: Agent;
+  room: Room;
   token: string;
 }
 
@@ -202,6 +248,9 @@ export interface CLIConfig {
   agentId?: string;
   agentName?: string;
   defaultRoom?: string;
+  roomKey?: string;
+  role?: AgentRole;
+  skills?: string[];
 }
 
 // API Error response
@@ -231,4 +280,8 @@ export interface CreateRoomRequest {
 
 export interface CreateRoomResponse {
   room: Room;
+}
+
+export interface GetRoomAgentsResponse {
+  agents: AgentInfo[];
 }

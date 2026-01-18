@@ -1,16 +1,19 @@
 import { v4 as uuid } from 'uuid';
-import type { Task, TaskStatus, TaskResult, CreateTaskRequest } from '@merge/shared-types';
+import type { Task, TaskStatus, TaskResult, CreateTaskRequest, TaskTarget } from '@merge/shared-types';
 import { wsService } from './ws.service.js';
+import { agentService } from './agent.service.js';
 
 class TaskService {
   private tasks: Map<string, Task> = new Map();
 
-  createTask(fromAgentId: string, request: CreateTaskRequest): Task {
+  createTask(fromAgentId: string, roomId: string, request: CreateTaskRequest): Task {
     const now = new Date().toISOString();
     const task: Task = {
       id: uuid(),
       fromAgentId,
       toAgentId: request.toAgentId || null,
+      roomId,
+      target: request.target,
       title: request.title,
       description: request.description,
       blocking: request.blocking ?? false,
@@ -20,14 +23,37 @@ class TaskService {
     };
 
     this.tasks.set(task.id, task);
-    console.log(`Task created: ${task.title} (${task.id})`);
+    console.log(`Task created: ${task.title} (${task.id}) in room ${roomId}`);
 
-    // Notify via WebSocket
-    wsService.broadcast({
-      type: 'task_created',
-      payload: { task },
-      timestamp: now,
-    });
+    // Notify via WebSocket based on target
+    if (task.target?.agentId) {
+      wsService.sendToAgent(task.target.agentId, {
+        type: 'task_created',
+        payload: { task },
+        timestamp: now,
+      });
+    } else if (task.target?.agentName) {
+      const targetAgent = agentService.getAgentByName(task.target.agentName, roomId);
+      if (targetAgent) {
+        wsService.sendToAgent(targetAgent.id, {
+          type: 'task_created',
+          payload: { task },
+          timestamp: now,
+        });
+      }
+    } else if (task.target?.skill) {
+      wsService.broadcastToAgentsWithSkill(roomId, task.target.skill, {
+        type: 'task_created',
+        payload: { task },
+        timestamp: now,
+      }, fromAgentId);
+    } else {
+      wsService.broadcastToRoomWorkers(roomId, {
+        type: 'task_created',
+        payload: { task },
+        timestamp: now,
+      }, fromAgentId);
+    }
 
     return task;
   }
@@ -36,12 +62,44 @@ class TaskService {
     return this.tasks.get(taskId);
   }
 
-  getPendingTasks(excludeAgentId?: string): Task[] {
+  getPendingTasks(excludeAgentId?: string, roomId?: string): Task[] {
     return Array.from(this.tasks.values()).filter(
       (task) =>
         task.status === 'pending' &&
-        (!excludeAgentId || task.fromAgentId !== excludeAgentId)
+        (!excludeAgentId || task.fromAgentId !== excludeAgentId) &&
+        (!roomId || task.roomId === roomId)
     );
+  }
+
+  getPendingTasksForAgent(agentId: string, roomId: string, agentSkills: string[]): Task[] {
+    const agent = agentService.getAgent(agentId);
+    if (!agent) return [];
+
+    return Array.from(this.tasks.values()).filter((task) => {
+      if (task.status !== 'pending') return false;
+      if (task.roomId !== roomId) return false;
+      if (task.fromAgentId === agentId) return false;
+
+      const target = task.target;
+
+      if (target?.agentId) {
+        return target.agentId === agentId;
+      }
+
+      if (target?.agentName) {
+        return target.agentName === agent.name;
+      }
+
+      if (target?.skill) {
+        return agentSkills.includes(target.skill);
+      }
+
+      if (agent.role === 'leader') {
+        return false;
+      }
+
+      return true;
+    });
   }
 
   getTasksForAgent(agentId: string): Task[] {

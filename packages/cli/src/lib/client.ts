@@ -8,6 +8,10 @@ import type {
   ConnectResponse,
   StatusResponse,
   APIError,
+  JoinRoomWithTokenResponse,
+  GetRoomAgentsResponse,
+  AgentRole,
+  AgentInfo,
 } from '@merge/shared-types';
 import { loadConfig } from './config.js';
 
@@ -135,4 +139,40 @@ export async function waitForTaskCompletion(
   }
 
   throw new Error(`Task ${taskId} did not complete within timeout`);
+}
+
+export async function joinRoom(
+  roomId: string,
+  name: string,
+  role: AgentRole,
+  skills: string[],
+  roomKey?: string,
+  serverUrl?: string
+): Promise<JoinRoomWithTokenResponse> {
+  const config = loadConfig();
+  const url = serverUrl || config.serverUrl;
+
+  const response = await fetch(`${url}/api/v1/rooms/${encodeURIComponent(roomId)}/join`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, role, skills, roomKey }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error = data as APIError;
+    throw new Error(error.error || `Join room failed: ${response.status}`);
+  }
+
+  return data as JoinRoomWithTokenResponse;
+}
+
+export async function getRoomAgents(roomId?: string): Promise<AgentInfo[]> {
+  const config = loadConfig();
+  const room = roomId || config.defaultRoom || 'default';
+  const response = await request<GetRoomAgentsResponse>('GET', `/api/v1/rooms/${encodeURIComponent(room)}/agents`);
+  return response.agents;
 }

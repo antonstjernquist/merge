@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
-import type { CreateRoomRequest } from '@merge/shared-types';
+import type { CreateRoomRequest, JoinRoomRequest, JoinRoomWithTokenResponse, GetRoomAgentsResponse } from '@merge/shared-types';
 import { roomService } from '../services/room.service.js';
+import { agentService } from '../services/agent.service.js';
 
 const router: Router = Router();
 
@@ -37,24 +38,91 @@ router.post('/', (req: Request, res: Response) => {
   res.status(201).json({ room });
 });
 
-// Join a room
+// Join a room (with optional key for new agents)
 router.post('/:roomId/join', (req: Request, res: Response) => {
   const { roomId } = req.params;
-  const agentId = req.headers['x-agent-id'] as string;
+  const body = req.body as JoinRoomRequest;
+  const existingAgentId = req.headers['x-agent-id'] as string;
 
-  if (!agentId) {
-    res.status(401).json({ error: 'Agent ID required' });
+  if (!body.name && !existingAgentId) {
+    res.status(400).json({ error: 'Agent name required for new agents' });
     return;
   }
 
-  const room = roomService.joinRoom(roomId, agentId);
+  let room = roomService.getRoom(roomId) || roomService.getRoomByName(roomId);
+
+  if (!room) {
+    room = roomService.createRoom(roomId);
+  }
+
+  if (room.isLocked) {
+    if (!body.roomKey) {
+      res.status(401).json({ error: 'Room key required' });
+      return;
+    }
+    if (!roomService.validateRoomKey(room.id, body.roomKey)) {
+      res.status(403).json({ error: 'Invalid room key' });
+      return;
+    }
+  }
+
+  let agent;
+  let token;
+
+  if (existingAgentId) {
+    agent = agentService.getAgent(existingAgentId);
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+    token = agent.token;
+    agentService.setAgentRoom(agent.id, room.id);
+  } else {
+    agent = agentService.connect(
+      body.name,
+      '',
+      body.role || 'worker',
+      body.skills || [],
+      room.id
+    );
+    token = agent.token;
+  }
+
+  if (body.roomKey && !room.isLocked) {
+    roomService.lockRoom(room.id, body.roomKey, agent.id);
+    room = roomService.getRoom(room.id)!;
+  }
+
+  roomService.joinRoom(room.id, agent.id);
+
+  const response: JoinRoomWithTokenResponse = {
+    agent,
+    room,
+    token,
+  };
+
+  res.status(200).json(response);
+});
+
+// Get agents in a room
+router.get('/:roomId/agents', (req: Request, res: Response) => {
+  const { roomId } = req.params;
+
+  const room = roomService.getRoom(roomId) || roomService.getRoomByName(roomId);
 
   if (!room) {
     res.status(404).json({ error: 'Room not found' });
     return;
   }
 
-  res.json({ room });
+  const agentIds = roomService.getRoomAgentIds(room.id);
+  const agents = agentIds
+    .map((id) => agentService.getAgent(id))
+    .filter((a) => a !== undefined)
+    .map((a) => agentService.getAgentInfo(a!));
+
+  const response: GetRoomAgentsResponse = { agents };
+  res.json(response);
 });
 
 // Leave a room

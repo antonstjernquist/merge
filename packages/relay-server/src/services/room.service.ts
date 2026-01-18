@@ -1,7 +1,12 @@
 import { v4 as uuid } from 'uuid';
+import { createHash } from 'crypto';
 import type { Room, RoomMessage } from '@merge/shared-types';
 
 const MAX_MESSAGES_PER_ROOM = 100;
+
+function hashKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex');
+}
 
 class RoomService {
   private rooms: Map<string, Room> = new Map();
@@ -12,7 +17,7 @@ class RoomService {
     this.createRoom('default');
   }
 
-  createRoom(name: string): Room {
+  createRoom(name: string, createdBy: string | null = null): Room {
     // Check if room with this name already exists
     const existing = this.getRoomByName(name);
     if (existing) {
@@ -25,6 +30,9 @@ class RoomService {
       name,
       createdAt: now,
       agentIds: [],
+      apiKeyHash: null,
+      isLocked: false,
+      createdBy,
     };
 
     this.rooms.set(room.id, room);
@@ -137,6 +145,37 @@ class RoomService {
   getRoomAgentIds(roomId: string): string[] {
     const room = this.rooms.get(roomId);
     return room ? [...room.agentIds] : [];
+  }
+
+  lockRoom(roomId: string, apiKey: string, agentId: string): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+
+    if (room.isLocked) {
+      return false;
+    }
+
+    room.apiKeyHash = hashKey(apiKey);
+    room.isLocked = true;
+    room.createdBy = agentId;
+    console.log(`Room locked: ${room.name} by agent ${agentId}`);
+    return true;
+  }
+
+  validateRoomKey(roomId: string, key: string): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+
+    if (!room.isLocked || !room.apiKeyHash) {
+      return true;
+    }
+
+    return room.apiKeyHash === hashKey(key);
+  }
+
+  isRoomLocked(roomId: string): boolean {
+    const room = this.rooms.get(roomId);
+    return room ? room.isLocked : false;
   }
 }
 

@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { Agent } from '@merge/shared-types';
+import type { Agent, AgentRole, AgentInfo } from '@merge/shared-types';
 import { config } from '../config.js';
 
 class AgentService {
@@ -13,21 +13,30 @@ class AgentService {
     }, 60000); // Check every minute
   }
 
-  connect(name: string, token: string): Agent {
+  connect(
+    name: string,
+    token: string,
+    role: AgentRole = 'worker',
+    skills: string[] = [],
+    roomId: string | null = null
+  ): Agent {
     const id = uuid();
     const now = new Date().toISOString();
 
     const agent: Agent = {
       id,
       name,
+      role,
+      skills,
       token,
+      currentRoomId: roomId,
       connectedAt: now,
       lastSeenAt: now,
       isConnected: true,
     };
 
     this.agents.set(id, agent);
-    console.log(`Agent connected: ${name} (${id})`);
+    console.log(`Agent connected: ${name} (${id}) role=${role} skills=[${skills.join(',')}]`);
     return agent;
   }
 
@@ -46,8 +55,54 @@ class AgentService {
     return this.agents.get(agentId);
   }
 
+  getAgentByName(name: string, roomId: string): Agent | undefined {
+    for (const agent of this.agents.values()) {
+      if (agent.name === name && agent.currentRoomId === roomId) {
+        return agent;
+      }
+    }
+    return undefined;
+  }
+
+  getAgentsBySkill(skill: string, roomId: string): Agent[] {
+    const result: Agent[] = [];
+    for (const agent of this.agents.values()) {
+      if (agent.currentRoomId === roomId && agent.skills.includes(skill)) {
+        result.push(agent);
+      }
+    }
+    return result;
+  }
+
+  getRoomWorkers(roomId: string): Agent[] {
+    const result: Agent[] = [];
+    for (const agent of this.agents.values()) {
+      if (agent.currentRoomId === roomId && (agent.role === 'worker' || agent.role === 'both')) {
+        result.push(agent);
+      }
+    }
+    return result;
+  }
+
   getConnectedAgents(): Agent[] {
     return Array.from(this.agents.values()).filter((a) => a.isConnected);
+  }
+
+  getAgentInfo(agent: Agent): AgentInfo {
+    return {
+      id: agent.id,
+      name: agent.name,
+      role: agent.role,
+      skills: agent.skills,
+      isConnected: agent.isConnected,
+    };
+  }
+
+  setAgentRoom(agentId: string, roomId: string | null): void {
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      agent.currentRoomId = roomId;
+    }
   }
 
   updateLastSeen(agentId: string): void {
