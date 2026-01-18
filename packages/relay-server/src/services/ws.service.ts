@@ -161,6 +161,9 @@ class WSService {
 
     client.rooms.add(room.id);
 
+    // Update agent's currentRoomId to the resolved UUID
+    agentService.setAgentRoom(client.agentId, room.id);
+
     // Get agent info
     const agent = agentService.getAgent(client.agentId);
     const agentInfo = {
@@ -242,7 +245,11 @@ class WSService {
   private handleSendTask(client: WSClient, payload: SendTaskPayload): void {
     if (!client.agentId) return;
 
-    const task = taskService.createTask(client.agentId, payload.roomId, {
+    // Resolve room name to UUID
+    const room = roomService.getRoom(payload.roomId) || roomService.getRoomByName(payload.roomId);
+    const roomId = room?.id || payload.roomId;
+
+    const task = taskService.createTask(client.agentId, roomId, {
       title: payload.title,
       description: payload.description,
       blocking: payload.blocking,

@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { requireAgent } from '../middleware/auth.js';
 import { taskService } from '../services/task.service.js';
 import { agentService } from '../services/agent.service.js';
+import { roomService } from '../services/room.service.js';
 import type {
   CreateTaskRequest,
   CreateTaskResponse,
@@ -11,6 +12,12 @@ import type {
   SubmitResultRequest,
   SubmitResultResponse,
 } from '@merge/shared-types';
+
+// Helper to resolve room name/id to UUID
+function resolveRoomId(nameOrId: string): string {
+  const room = roomService.getRoom(nameOrId) || roomService.getRoomByName(nameOrId);
+  return room?.id || nameOrId;
+}
 
 const router: IRouter = Router();
 
@@ -30,7 +37,8 @@ router.post('/', requireAgent, (req: AuthenticatedRequest, res) => {
   }
 
   const agent = agentService.getAgent(agentId);
-  const roomId = body.roomId || agent?.currentRoomId || 'default';
+  const rawRoomId = body.roomId || agent?.currentRoomId || 'default';
+  const roomId = resolveRoomId(rawRoomId);
 
   const task = taskService.createTask(agentId, roomId, body);
 
@@ -51,7 +59,8 @@ router.get('/', requireAgent, (req: AuthenticatedRequest, res) => {
 router.get('/pending', requireAgent, (req: AuthenticatedRequest, res) => {
   const agentId = req.agentId!;
   const agent = agentService.getAgent(agentId);
-  const roomId = (req.query.roomId as string) || agent?.currentRoomId || 'default';
+  const rawRoomId = (req.query.roomId as string) || agent?.currentRoomId || 'default';
+  const roomId = resolveRoomId(rawRoomId);
   const agentSkills = agent?.skills || [];
 
   const tasks = taskService.getPendingTasksForAgent(agentId, roomId, agentSkills);

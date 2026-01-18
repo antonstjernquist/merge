@@ -2,9 +2,32 @@ import { v4 as uuid } from 'uuid';
 import type { Agent, AgentRole, AgentInfo } from '@merge/shared-types';
 import { config } from '../config.js';
 
+// Lazy import to avoid circular dependency
+let roomServiceRef: typeof import('./room.service.js').roomService | null = null;
+async function getRoomService() {
+  if (!roomServiceRef) {
+    const mod = await import('./room.service.js');
+    roomServiceRef = mod.roomService;
+  }
+  return roomServiceRef;
+}
+
 class AgentService {
   private agents: Map<string, Agent> = new Map();
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private roomServiceSync: typeof import('./room.service.js').roomService | null = null;
+
+  // Initialize room service reference synchronously after startup
+  initRoomService(rs: typeof import('./room.service.js').roomService): void {
+    this.roomServiceSync = rs;
+  }
+
+  // Resolve room name or ID to UUID
+  private resolveRoomId(nameOrId: string): string {
+    if (!this.roomServiceSync) return nameOrId;
+    const room = this.roomServiceSync.getRoom(nameOrId) || this.roomServiceSync.getRoomByName(nameOrId);
+    return room?.id || nameOrId;
+  }
 
   constructor() {
     // Start cleanup interval
@@ -56,8 +79,9 @@ class AgentService {
   }
 
   getAgentByName(name: string, roomId: string): Agent | undefined {
+    const resolvedRoomId = this.resolveRoomId(roomId);
     for (const agent of this.agents.values()) {
-      if (agent.name === name && agent.currentRoomId === roomId) {
+      if (agent.name === name && agent.currentRoomId === resolvedRoomId) {
         return agent;
       }
     }
@@ -65,9 +89,10 @@ class AgentService {
   }
 
   getAgentsBySkill(skill: string, roomId: string): Agent[] {
+    const resolvedRoomId = this.resolveRoomId(roomId);
     const result: Agent[] = [];
     for (const agent of this.agents.values()) {
-      if (agent.currentRoomId === roomId && agent.skills.includes(skill)) {
+      if (agent.currentRoomId === resolvedRoomId && agent.skills.includes(skill)) {
         result.push(agent);
       }
     }
@@ -75,9 +100,10 @@ class AgentService {
   }
 
   getRoomWorkers(roomId: string): Agent[] {
+    const resolvedRoomId = this.resolveRoomId(roomId);
     const result: Agent[] = [];
     for (const agent of this.agents.values()) {
-      if (agent.currentRoomId === roomId && (agent.role === 'worker' || agent.role === 'both')) {
+      if (agent.currentRoomId === resolvedRoomId && (agent.role === 'worker' || agent.role === 'both')) {
         result.push(agent);
       }
     }

@@ -5,9 +5,14 @@ import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { wsService } from './services/ws.service.js';
+import { agentService } from './services/agent.service.js';
+import { roomService } from './services/room.service.js';
 import authRoutes from './routes/auth.routes.js';
 import tasksRoutes from './routes/tasks.routes.js';
 import roomsRoutes from './routes/rooms.routes.js';
+
+// Initialize agent service with room service reference (for room ID resolution)
+agentService.initRoomService(roomService);
 
 const app = express();
 const server = createServer(app);
