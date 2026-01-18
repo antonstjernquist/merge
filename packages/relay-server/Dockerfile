@@ -29,7 +29,7 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
 COPY --from=builder /app/packages/shared-types/package.json ./packages/shared-types/
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/relay-server/package.json ./packages/relay-server/
