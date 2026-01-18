@@ -36,14 +36,40 @@ class AgentService {
     }, 60000); // Check every minute
   }
 
+  // Check if an agent ID is currently active
+  isAgentActive(agentId: string): boolean {
+    const agent = this.agents.get(agentId);
+    return agent?.isConnected ?? false;
+  }
+
   connect(
     name: string,
     token: string,
     role: AgentRole = 'worker',
     skills: string[] = [],
-    roomId: string | null = null
-  ): Agent {
-    const id = uuid();
+    roomId: string | null = null,
+    clientAgentId?: string // Client-provided persistent ID
+  ): Agent | { error: string } {
+    // Use client-provided ID or generate new one
+    const id = clientAgentId || uuid();
+
+    // Handle existing session with same ID
+    if (clientAgentId) {
+      const existing = this.agents.get(clientAgentId);
+      if (existing) {
+        // Update existing session instead of rejecting
+        // This allows the same agent to reconnect/rejoin
+        existing.name = name;
+        existing.role = role;
+        existing.skills = skills;
+        existing.currentRoomId = roomId;
+        existing.lastSeenAt = new Date().toISOString();
+        existing.isConnected = true;
+        console.log(`Agent reconnected: ${name} (${clientAgentId}) role=${role} skills=[${skills.join(',')}]`);
+        return existing;
+      }
+    }
+
     const now = new Date().toISOString();
 
     const agent: Agent = {

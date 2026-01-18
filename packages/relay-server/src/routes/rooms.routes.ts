@@ -78,13 +78,23 @@ router.post('/:roomId/join', (req: Request, res: Response) => {
     token = agent.token;
     agentService.setAgentRoom(agent.id, room.id);
   } else {
-    agent = agentService.connect(
+    // Use client-provided agent ID if available
+    const result = agentService.connect(
       body.name,
       '',
       body.role || 'worker',
       body.skills || [],
-      room.id
+      room.id,
+      body.agentId // Client-provided persistent ID
     );
+
+    // Check if connection failed (ID already in use)
+    if ('error' in result) {
+      res.status(409).json({ error: result.error });
+      return;
+    }
+
+    agent = result;
     token = agent.token;
   }
 

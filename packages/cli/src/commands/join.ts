@@ -11,10 +11,12 @@ export const joinCommand = new Command('join')
   .option('--role <role>', 'Agent role: leader, worker, or both (default: worker)', 'worker')
   .option('--skills <skills>', 'Comma-separated list of skills')
   .option('--server <url>', 'Server URL')
+  .option('--token <token>', 'Authentication token')
   .action(async (room, options) => {
     try {
       const config = loadConfig();
       const serverUrl = options.server || config.serverUrl;
+      const token = options.token || config.token;
 
       const role = (options.role || 'worker') as AgentRole;
       const skills = options.skills ? options.skills.split(',').map((s: string) => s.trim()) : [];
@@ -25,14 +27,15 @@ export const joinCommand = new Command('join')
         role,
         skills,
         options.key,
-        serverUrl
+        serverUrl,
+        token
       );
 
       updateConfig({
         serverUrl,
         wsUrl: serverUrl.replace(/^http/, 'ws'),
         token: response.token,
-        agentId: response.agent.id,
+        // agentId is persistent and client-controlled - don't overwrite
         agentName: response.agent.name,
         defaultRoom: response.room.name,
         roomKey: options.key,
@@ -44,7 +47,7 @@ export const joinCommand = new Command('join')
         success: true,
         message: 'Joined room successfully',
         agent: {
-          id: response.agent.id,
+          id: config.agentId, // Persistent client-controlled ID
           name: response.agent.name,
           role: response.agent.role,
           skills: response.agent.skills,

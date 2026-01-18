@@ -9,17 +9,31 @@ const router: IRouter = Router();
 
 // POST /api/v1/auth/connect - Connect as an agent
 router.post('/connect', (req: AuthenticatedRequest, res) => {
-  const { name } = req.body as ConnectRequest;
+  const { name, agentId: clientAgentId } = req.body as ConnectRequest;
 
   if (!name || typeof name !== 'string') {
     res.status(400).json({ error: 'Name is required' });
     return;
   }
 
-  const agent = agentService.connect(name, config.sharedToken);
+  // Use client-provided agent ID if available
+  const result = agentService.connect(
+    name,
+    config.sharedToken,
+    'worker',
+    [],
+    null,
+    clientAgentId
+  );
+
+  // Check if connection failed (ID already in use)
+  if ('error' in result) {
+    res.status(409).json({ error: result.error });
+    return;
+  }
 
   const response: ConnectResponse = {
-    agent,
+    agent: result,
     token: config.sharedToken,
   };
 

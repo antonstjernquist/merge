@@ -19,7 +19,7 @@ export const connectCommand = new Command('connect')
         serverUrl,
         wsUrl: serverUrl.replace(/^http/, 'ws'),
         token: options.token,
-        agentId: response.agent.id,
+        // agentId is persistent and client-controlled - don't overwrite
         agentName: response.agent.name,
         defaultRoom: options.room || 'default',
       });
@@ -28,7 +28,7 @@ export const connectCommand = new Command('connect')
         success: true,
         message: 'Connected successfully',
         agent: {
-          id: response.agent.id,
+          id: config.agentId, // Persistent client-controlled ID
           name: response.agent.name,
         },
         configPath: getConfigPath(),

@@ -212,6 +212,7 @@ export interface ConnectRequest {
   name: string;
   role?: AgentRole;
   skills?: string[];
+  agentId?: string; // Client-provided persistent ID
 }
 
 export interface ConnectResponse {
@@ -225,6 +226,7 @@ export interface JoinRoomRequest {
   role: AgentRole;
   skills: string[];
   roomKey?: string;
+  agentId?: string; // Client-provided persistent ID
 }
 
 export interface JoinRoomWithTokenResponse {

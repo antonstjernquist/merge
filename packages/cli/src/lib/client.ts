@@ -55,13 +55,17 @@ export async function connect(name: string, token: string, serverUrl?: string): 
   const config = loadConfig();
   const url = serverUrl || config.serverUrl;
 
+  // Send client-controlled agent ID
   const response = await fetch(`${url}/api/v1/auth/connect`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name,
+      agentId: config.agentId, // Client-provided persistent ID
+    }),
   });
 
   const data = await response.json();
@@ -147,17 +151,33 @@ export async function joinRoom(
   role: AgentRole,
   skills: string[],
   roomKey?: string,
-  serverUrl?: string
+  serverUrl?: string,
+  token?: string
 ): Promise<JoinRoomWithTokenResponse> {
   const config = loadConfig();
   const url = serverUrl || config.serverUrl;
+  const authToken = token || config.token;
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add authorization if token available
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  // Send client-controlled agent ID
   const response = await fetch(`${url}/api/v1/rooms/${encodeURIComponent(roomId)}/join`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name, role, skills, roomKey }),
+    headers,
+    body: JSON.stringify({
+      name,
+      role,
+      skills,
+      roomKey,
+      agentId: config.agentId, // Client-provided persistent ID
+    }),
   });
 
   const data = await response.json();

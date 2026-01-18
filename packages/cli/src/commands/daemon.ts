@@ -1,12 +1,13 @@
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import { WebSocketClient } from '../lib/websocket.js';
-import { loadConfig, isConnected } from '../lib/config.js';
-import { acceptTask } from '../lib/client.js';
+import { loadConfig, updateConfig } from '../lib/config.js';
+import { acceptTask, joinRoom } from '../lib/client.js';
 import type {
   WSMessage,
   RoomTaskPayload,
   Task,
+  AgentRole,
 } from '@merge/shared-types';
 
 // Check if claude CLI is available
@@ -56,6 +57,11 @@ interface DaemonOptions {
   cwd?: string;
   autoAccept?: boolean;
   verbose?: boolean;
+  name?: string;
+  role?: AgentRole;
+  skills?: string[];
+  server?: string;
+  token?: string;
 }
 
 class AgentDaemon {
@@ -202,23 +208,77 @@ class AgentDaemon {
 
 export const daemonCommand = new Command('daemon')
   .description('Run as a daemon that listens for and executes tasks using Claude Code SDK')
-  .option('--room <room>', 'Room to join (uses default from config if not specified)')
+  .option('--room <room>', 'Room to join (default: "default")')
   .option('--cwd <directory>', 'Working directory for task execution (default: current directory)')
   .option('--auto-accept', 'Automatically accept and execute incoming tasks')
   .option('--verbose', 'Enable verbose logging')
+  .option('--name <name>', 'Agent name (required on first run)')
+  .option('--role <role>', 'Agent role: leader, worker, or both (default: worker)')
+  .option('--skills <skills>', 'Comma-separated list of skills')
+  .option('--server <url>', 'Server URL')
+  .option('--token <token>', 'Authentication token')
   .action(async (options) => {
-    if (!isConnected()) {
+    const config = loadConfig();
+
+    // Determine server URL and token
+    const serverUrl = options.server || config.serverUrl;
+    const token = options.token || config.token;
+    const room = options.room || config.defaultRoom || 'default';
+    const name = options.name || config.agentName;
+    const role = (options.role || config.role || 'worker') as AgentRole;
+    const skills = options.skills
+      ? options.skills.split(',').map((s: string) => s.trim())
+      : config.skills || [];
+
+    // Validate required options
+    if (!serverUrl || serverUrl === 'http://localhost:3000') {
+      if (!options.server) {
+        console.error(JSON.stringify({
+          success: false,
+          error: 'Server URL required. Use --server <url> or run "agent-merge join" first.',
+        }, null, 2));
+        process.exit(1);
+      }
+    }
+
+    if (!name) {
       console.error(JSON.stringify({
         success: false,
-        error: 'Not connected. Run "agent-merge connect" first.',
-      }));
+        error: 'Agent name required. Use --name <name> or run "agent-merge join" first.',
+      }, null, 2));
       process.exit(1);
     }
 
-    const config = loadConfig();
+    // Self-register with the server
+    console.log(`Registering with server at ${serverUrl}...`);
+    try {
+      const response = await joinRoom(room, name, role, skills, undefined, serverUrl, token);
+
+      // Update config with connection info
+      updateConfig({
+        serverUrl,
+        wsUrl: serverUrl.replace(/^http/, 'ws'),
+        token: response.token,
+        agentName: response.agent.name,
+        defaultRoom: response.room.name,
+        role,
+        skills,
+      });
+
+      console.log(`Registered as "${response.agent.name}" (${config.agentId})`);
+    } catch (error) {
+      console.error(JSON.stringify({
+        success: false,
+        error: `Registration failed: ${error instanceof Error ? error.message : error}`,
+      }, null, 2));
+      process.exit(1);
+    }
+
+    // Reload config after update
+    const updatedConfig = loadConfig();
 
     const daemon = new AgentDaemon({
-      room: options.room || config.defaultRoom,
+      room: updatedConfig.defaultRoom || room,
       cwd: options.cwd,
       autoAccept: options.autoAccept,
       verbose: options.verbose,
