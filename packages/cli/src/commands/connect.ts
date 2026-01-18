@@ -7,6 +7,7 @@ export const connectCommand = new Command('connect')
   .requiredOption('--token <token>', 'Authentication token')
   .requiredOption('--name <name>', 'Agent name')
   .option('--server <url>', 'Server URL (default: http://localhost:3000)')
+  .option('--room <room>', 'Default room to join (default: "default")')
   .action(async (options) => {
     try {
       const config = loadConfig();
@@ -20,6 +21,7 @@ export const connectCommand = new Command('connect')
         token: options.token,
         agentId: response.agent.id,
         agentName: response.agent.name,
+        defaultRoom: options.room || 'default',
       });
 
       console.log(JSON.stringify({

@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { wsService } from './services/ws.service.js';
 import authRoutes from './routes/auth.routes.js';
 import tasksRoutes from './routes/tasks.routes.js';
+import roomsRoutes from './routes/rooms.routes.js';
 
 const app = express();
 const server = createServer(app);
@@ -23,6 +24,7 @@ app.get('/health', (_req, res) => {
 // API routes (auth required)
 app.use('/api/v1/auth', authMiddleware, authRoutes);
 app.use('/api/v1/tasks', authMiddleware, tasksRoutes);
+app.use('/api/v1/rooms', authMiddleware, roomsRoutes);
 
 // Error handler
 app.use(errorHandler);

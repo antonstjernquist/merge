@@ -36,9 +36,26 @@ pnpm dev:relay
 
 ### Connection
 ```bash
-agent-merge connect --token <token> --name "Agent Name"
+agent-merge connect --token <token> --name "Agent Name" --room <room>
 agent-merge disconnect
 agent-merge status
+```
+
+### Real-time Communication
+```bash
+agent-merge listen                      # Listen for real-time events via WebSocket
+agent-merge listen --room "project-x"   # Listen in a specific room
+agent-merge listen --json               # Output raw JSON messages
+agent-merge listen --types "room_task,task_completed"  # Filter event types
+```
+
+### Daemon Mode (AI Task Execution)
+```bash
+agent-merge daemon                      # Run as daemon, manually accept tasks
+agent-merge daemon --auto-accept        # Auto-accept and execute tasks via Claude Code SDK
+agent-merge daemon --room "project-x"   # Join a specific room
+agent-merge daemon --cwd /path/to/work  # Set working directory for task execution
+agent-merge daemon --verbose            # Enable verbose logging
 ```
 
 ### Leader Commands (sending tasks)
@@ -99,6 +116,7 @@ wsUrl: ws://localhost:3000
 token: your-token
 agentId: uuid
 agentName: Agent Name
+defaultRoom: default
 ```
 
 ## Deployment
@@ -136,13 +154,45 @@ docker-compose up -d
 
 ## API Endpoints
 
+### Authentication
 - `POST /api/v1/auth/connect` - Connect as agent
 - `POST /api/v1/auth/disconnect` - Disconnect
 - `GET /api/v1/auth/status` - Get status
+
+### Tasks
 - `POST /api/v1/tasks` - Create task
 - `GET /api/v1/tasks` - List tasks
 - `GET /api/v1/tasks/pending` - Get pending tasks
 - `GET /api/v1/tasks/:id` - Get task details
 - `PATCH /api/v1/tasks/:id/accept` - Accept task
 - `PATCH /api/v1/tasks/:id/result` - Submit result
-- `WS /ws?token=<token>&agentId=<id>` - WebSocket connection
+
+### Rooms
+- `GET /api/v1/rooms` - List all rooms
+- `GET /api/v1/rooms/:roomId` - Get room with message history
+- `POST /api/v1/rooms` - Create a new room
+- `POST /api/v1/rooms/:roomId/join` - Join a room
+- `POST /api/v1/rooms/:roomId/leave` - Leave a room
+- `GET /api/v1/rooms/:roomId/messages` - Get room messages
+
+### WebSocket
+- `WS /ws?token=<token>&agentId=<id>&room=<room>` - WebSocket connection
+
+#### WebSocket Events (Server -> Client)
+- `room_joined` - Agent joined a room
+- `room_left` - Agent left a room
+- `room_message` - New message in room
+- `room_task` - New task in room
+- `task_created` - Task was created
+- `task_assigned` - Task was assigned
+- `task_updated` - Task status changed
+- `task_completed` - Task completed
+- `task_progress` - Task progress update
+
+#### WebSocket Actions (Client -> Server)
+- `join_room` - Join a room
+- `leave_room` - Leave a room
+- `send_message` - Send message to room
+- `send_task` - Send task to room
+- `task_progress` - Report task progress
+- `task_result` - Submit task result

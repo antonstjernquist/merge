@@ -9,11 +9,13 @@ import { resultCommand } from './commands/result.js';
 import { statusCommand } from './commands/status.js';
 import { taskCommand } from './commands/task.js';
 import { tasksCommand } from './commands/tasks.js';
+import { listenCommand } from './commands/listen.js';
+import { daemonCommand } from './commands/daemon.js';
 
 const program = new Command();
 
 program
-  .name('merge')
+  .name('agent-merge')
   .description('Claude Code Agent Collaboration CLI')
   .version('0.1.0');
 
@@ -27,5 +29,7 @@ program.addCommand(resultCommand);
 program.addCommand(statusCommand);
 program.addCommand(taskCommand);
 program.addCommand(tasksCommand);
+program.addCommand(listenCommand);
+program.addCommand(daemonCommand);
 
 program.parse();
