@@ -20,16 +20,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install wrangler
-        run: npm install -g wrangler
-
       - name: Upload install script
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
         run: |
-          wrangler r2 object put kresis/merge/install.sh \
-            --file scripts/install.sh \
-            --content-type "text/x-shellscript" \
-            --jurisdiction eu \
-            --remote
+          aws s3 cp scripts/install.sh s3://kresis/merge/install.sh \
+            --endpoint-url https://e9684f01c30263ee36957bc129b93d46.eu.r2.cloudflarestorage.com \
+            --content-type "text/x-shellscript"
