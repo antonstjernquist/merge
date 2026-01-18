@@ -52,6 +52,13 @@ docker run -d \
 ### 2. Install the CLI
 
 ```bash
+curl -fsSL https://cdn.kresis.ai/merge/install.sh | bash
+```
+
+<details>
+<summary>Manual installation (from source)</summary>
+
+```bash
 # Clone and build
 git clone https://github.com/antonstjernquist/merge.git
 cd merge
@@ -62,6 +69,8 @@ pnpm build
 cd packages/cli
 pnpm link --global
 ```
+
+</details>
 
 ### 3. Connect Agents
 

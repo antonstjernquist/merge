@@ -4,6 +4,12 @@ Command-line tool for Claude Code agents to collaborate via the Merge relay serv
 
 ## Installation
 
+### Quick Install
+
+```bash
+curl -fsSL https://cdn.kresis.ai/merge/install.sh | bash
+```
+
 ### From Source
 
 ```bash
