@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { spawn } from 'child_process';
 import { WebSocketClient } from '../lib/websocket.js';
 import { loadConfig, isConnected } from '../lib/config.js';
 import { acceptTask } from '../lib/client.js';
@@ -8,21 +9,46 @@ import type {
   Task,
 } from '@merge/shared-types';
 
-// Claude Code SDK type (when available)
-type ClaudeFunction = (
-  prompt: string,
-  options?: { cwd?: string }
-) => AsyncIterable<{ type: string; content?: string; result?: unknown }>;
+// Check if claude CLI is available
+async function hasClaudeCLI(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const proc = spawn('claude', ['--version'], { stdio: 'ignore' });
+    proc.on('error', () => resolve(false));
+    proc.on('close', (code) => resolve(code === 0));
+  });
+}
 
-// Dynamic import for Claude Code SDK (may not be installed)
-async function getClaudeCode(): Promise<ClaudeFunction | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const module = await import('@anthropic-ai/claude-code' as string);
-    return module.claude as ClaudeFunction;
-  } catch {
-    return null;
-  }
+// Run claude CLI with a prompt
+function runClaude(prompt: string, cwd: string): Promise<{ success: boolean; output: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn('claude', ['-p', prompt, '--no-input'], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('error', (err) => {
+      resolve({ success: false, output: `Failed to run claude: ${err.message}` });
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true, output: stdout.trim() });
+      } else {
+        resolve({ success: false, output: stderr || stdout || `Exit code: ${code}` });
+      }
+    });
+  });
 }
 
 interface DaemonOptions {
@@ -36,7 +62,7 @@ class AgentDaemon {
   private client: WebSocketClient;
   private options: DaemonOptions;
   private activeTasks: Map<string, Task> = new Map();
-  private claudeCode: ClaudeFunction | null = null;
+  private hasClaudeCliAvailable = false;
   private cwd: string;
 
   constructor(options: DaemonOptions) {
@@ -61,13 +87,13 @@ class AgentDaemon {
   }
 
   async start(): Promise<void> {
-    // Try to load Claude Code SDK
-    this.claudeCode = await getClaudeCode();
-    if (!this.claudeCode) {
-      console.log('Note: Claude Code SDK not found. Tasks will be logged but not executed.');
-      console.log('Install with: npm install -g @anthropic-ai/claude-code');
+    // Check if claude CLI is available
+    this.hasClaudeCliAvailable = await hasClaudeCLI();
+    if (!this.hasClaudeCliAvailable) {
+      console.log('Note: Claude CLI not found. Tasks will be accepted but not auto-executed.');
+      console.log('Install Claude Code from: https://claude.ai/download');
     } else {
-      console.log('Claude Code SDK loaded successfully.');
+      console.log('Claude CLI available - tasks will be auto-executed.');
     }
 
     await this.client.connect();
@@ -137,44 +163,33 @@ class AgentDaemon {
       return;
     }
 
-    if (!this.claudeCode) {
-      // No Claude Code SDK - just log and send a placeholder result
-      console.log('(Claude Code SDK not available - sending placeholder result)');
+    if (!this.hasClaudeCliAvailable) {
+      // No Claude CLI - send a placeholder result
+      console.log('(Claude CLI not available - sending placeholder result)');
 
       this.client.sendTaskResult(
         task.id,
         true,
-        'Task received but Claude Code SDK not available. Install @anthropic-ai/claude-code to enable AI execution.'
+        'Task accepted but Claude CLI not available. Install from https://claude.ai/download'
       );
+      this.activeTasks.delete(task.id);
       return;
     }
 
     try {
-      // Use Claude Code SDK to execute the task
-      const claude = this.claudeCode;
-      if (!claude) return;
-
+      // Use Claude CLI to execute the task
       const prompt = `${task.title}\n\n${task.description}`;
-      let result = '';
+      console.log('Running claude CLI...');
 
-      // Stream the response
-      for await (const event of claude(prompt, { cwd: this.cwd })) {
-        if (event.type === 'text') {
-          result += event.content;
+      const result = await runClaude(prompt, this.cwd);
 
-          // Send progress updates periodically
-          if (result.length % 500 === 0) {
-            this.client.sendTaskProgress(task.id, result.slice(-200));
-          }
-        } else if (event.type === 'result') {
-          // Final result
-          result = typeof event.result === 'string' ? event.result : JSON.stringify(event.result);
-        }
+      if (result.success) {
+        console.log('Task completed successfully');
+        this.client.sendTaskResult(task.id, true, result.output);
+      } else {
+        console.error(`Task failed: ${result.output}`);
+        this.client.sendTaskResult(task.id, false, undefined, result.output);
       }
-
-      console.log('Task completed successfully');
-      this.client.sendTaskResult(task.id, true, result);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`Task failed: ${errorMessage}`);

@@ -1,0 +1,69 @@
+name: Build CLI Binaries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cli/**'
+      - 'packages/shared-types/**'
+      - '.github/workflows/cli.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build shared-types
+        run: cd packages/shared-types && bun run build
+
+      - name: Create release directory
+        run: mkdir -p packages/cli/release
+
+      - name: Build Linux x64
+        run: cd packages/cli && bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile ./release/agent-merge-linux-x64
+
+      - name: Build Linux ARM64
+        run: cd packages/cli && bun build ./src/index.ts --compile --target=bun-linux-arm64 --outfile ./release/agent-merge-linux-arm64
+
+      - name: Build macOS x64
+        run: cd packages/cli && bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile ./release/agent-merge-darwin-x64
+
+      - name: Build macOS ARM64
+        run: cd packages/cli && bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile ./release/agent-merge-darwin-arm64
+
+      - name: Build Windows x64
+        run: cd packages/cli && bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile ./release/agent-merge-windows-x64.exe
+
+      - name: Upload to R2 (CDN)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          for file in packages/cli/release/*; do
+            filename=$(basename "$file")
+            aws s3 cp "$file" "s3://kresis/merge/bin/$filename" \
+              --endpoint-url https://e9684f01c30263ee36957bc129b93d46.eu.r2.cloudflarestorage.com \
+              --content-type "application/octet-stream"
+          done
+
+      - name: Upload install script
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp scripts/install.sh s3://kresis/merge/install.sh \
+            --endpoint-url https://e9684f01c30263ee36957bc129b93d46.eu.r2.cloudflarestorage.com \
+            --content-type "text/x-shellscript"
