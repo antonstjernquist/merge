@@ -193,6 +193,18 @@ class TaskService {
   getAllTasks(): Task[] {
     return Array.from(this.tasks.values());
   }
+
+  deleteTask(taskId: string, agentId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) return false;
+
+    // Only the task creator can delete it
+    if (task.fromAgentId !== agentId) return false;
+
+    this.tasks.delete(taskId);
+    console.log(`Task deleted: ${task.title} (${taskId})`);
+    return true;
+  }
 }
 
 export const taskService = new TaskService();

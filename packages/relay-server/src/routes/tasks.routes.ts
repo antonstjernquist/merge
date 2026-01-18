@@ -144,4 +144,19 @@ router.patch('/:id/result', requireAgent, (req: AuthenticatedRequest, res) => {
   res.json(response);
 });
 
+// DELETE /api/v1/tasks/:id - Delete a task (only creator can delete)
+router.delete('/:id', requireAgent, (req: AuthenticatedRequest, res) => {
+  const agentId = req.agentId!;
+  const taskId = req.params.id;
+
+  const deleted = taskService.deleteTask(taskId, agentId);
+
+  if (!deleted) {
+    res.status(400).json({ error: 'Cannot delete task. It may not exist or you are not the creator.' });
+    return;
+  }
+
+  res.json({ success: true, message: 'Task deleted' });
+});
+
 export default router;
