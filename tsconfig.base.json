@@ -15,7 +15,8 @@
     "baseUrl": ".",
     "paths": {
       "@merge/shared-types": ["packages/shared-types/src/index.ts"],
-      "@merge/cli": ["packages/cli/src/index.ts"]
+      "@merge/cli": ["packages/cli/src/index.ts"],
+      "@merge/mcp-server": ["packages/mcp-server/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist"]
