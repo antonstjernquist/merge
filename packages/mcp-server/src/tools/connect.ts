@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { joinRoom } from '../lib/client.js';
 import { updateState, getState } from '../lib/state.js';
+import { saveSession } from '../lib/config.js';
 import type { AgentRole } from '@merge/shared-types';
 
 const connectSchema = z.object({
@@ -28,6 +29,14 @@ export function registerConnectTool(server: McpServer) {
           roomId: response.room.id,
           roomName: response.room.name,
           agentName: name,
+        });
+
+        saveSession({
+          roomName: room,
+          agentName: name,
+          role: role as AgentRole,
+          skills,
+          roomKey,
         });
 
         const state = getState();

@@ -3,10 +3,18 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { parse, stringify } from 'yaml';
+import type { AgentRole } from '@merge/shared-types';
 
 export interface MCPConfig {
   agentId: string;
   serverUrl: string;
+  session?: {
+    roomName: string;
+    agentName: string;
+    role: AgentRole;
+    skills: string[];
+    roomKey?: string;
+  };
 }
 
 const CONFIG_DIR = join(homedir(), '.merge');
@@ -42,6 +50,7 @@ export function loadConfig(): MCPConfig {
   return {
     agentId: config.agentId,
     serverUrl: config.serverUrl || process.env.MERGE_SERVER_URL || DEFAULT_SERVER_URL,
+    session: config.session,
   };
 }
 
@@ -49,4 +58,16 @@ export function saveConfig(config: MCPConfig): void {
   ensureConfigDir();
   const content = stringify(config);
   writeFileSync(CONFIG_FILE, content, 'utf-8');
+}
+
+export function saveSession(session: MCPConfig['session']): void {
+  const config = loadConfig();
+  config.session = session;
+  saveConfig(config);
+}
+
+export function clearSession(): void {
+  const config = loadConfig();
+  delete config.session;
+  saveConfig(config);
 }

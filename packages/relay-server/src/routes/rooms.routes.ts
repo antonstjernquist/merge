@@ -172,4 +172,42 @@ router.get('/:roomId/messages', (req: Request, res: Response) => {
   res.json({ messages });
 });
 
+// Send a message to a room
+router.post('/:roomId/messages', (req: Request, res: Response) => {
+  const { roomId } = req.params;
+  const agentId = req.headers['x-agent-id'] as string;
+  const { content, toAgentId } = req.body as { content: string; toAgentId?: string };
+
+  if (!agentId) {
+    res.status(401).json({ error: 'Agent ID required' });
+    return;
+  }
+
+  if (!content) {
+    res.status(400).json({ error: 'Message content required' });
+    return;
+  }
+
+  const room = roomService.getRoom(roomId) || roomService.getRoomByName(roomId);
+
+  if (!room) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  if (!room.agentIds.includes(agentId)) {
+    res.status(403).json({ error: 'Agent not in room' });
+    return;
+  }
+
+  const message = roomService.addMessage(room.id, agentId, content, toAgentId);
+
+  if (!message) {
+    res.status(500).json({ error: 'Failed to send message' });
+    return;
+  }
+
+  res.status(201).json({ message });
+});
+
 export default router;

@@ -12,12 +12,71 @@ import type {
   AgentInfo,
   RoomMessage,
 } from '@merge/shared-types';
-import { getState } from './state.js';
+import { getState, updateState } from './state.js';
+import { loadConfig } from './config.js';
+
+let isReconnecting = false;
+
+async function tryReconnect(): Promise<boolean> {
+  if (isReconnecting) return false;
+
+  const config = loadConfig();
+  if (!config.session) return false;
+
+  isReconnecting = true;
+  try {
+    const state = getState();
+    const sharedToken = process.env.MERGE_TOKEN;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (sharedToken) {
+      headers['Authorization'] = `Bearer ${sharedToken}`;
+    }
+
+    const response = await fetch(
+      `${state.serverUrl}/api/v1/rooms/${encodeURIComponent(config.session.roomName)}/join`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: config.session.agentName,
+          role: config.session.role,
+          skills: config.session.skills,
+          roomKey: config.session.roomKey,
+          agentId: state.agentId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = (await response.json()) as JoinRoomWithTokenResponse;
+
+    updateState({
+      token: data.token,
+      roomId: data.room.id,
+      roomName: data.room.name,
+      agentName: data.agent.name,
+    });
+
+    return true;
+  } catch {
+    return false;
+  } finally {
+    isReconnecting = false;
+  }
+}
 
 async function request<T>(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  retryOnAuthError = true
 ): Promise<T> {
   const state = getState();
   const url = `${state.serverUrl}${path}`;
@@ -44,6 +103,14 @@ async function request<T>(
 
   if (!response.ok) {
     const error = data as APIError;
+
+    if (retryOnAuthError && (response.status === 401 || response.status === 403)) {
+      const reconnected = await tryReconnect();
+      if (reconnected) {
+        return request<T>(method, path, body, false);
+      }
+    }
+
     throw new Error(error.error || `Request failed: ${response.status}`);
   }
 
